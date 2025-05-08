@@ -50,6 +50,11 @@ $result = mysqli_query($conn, $query);
 // Ambil semua kategori untuk filter
 $category_query = "SELECT DISTINCT category FROM books ORDER BY category";
 $category_result = mysqli_query($conn, $category_query);
+
+// Debug: Periksa direktori uploads
+$upload_dir = "uploads/";
+$is_dir_readable = is_readable($upload_dir);
+$is_dir_exists = is_dir($upload_dir);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -59,8 +64,69 @@ $category_result = mysqli_query($conn, $category_query);
     <title>Katalog Buku Perpustakaan</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="catalog.css?v=<?php echo time(); ?>">
+    <style>
+        /* Tambahan styling untuk gambar sampul */
+        .book-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 8px 8px 0 0;
+            transition: transform 0.3s ease;
+            display: block;
+        }
+        
+        /* Menambahkan placeholder untuk gambar yang gagal dimuat */
+        .book-card .image-container {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            background-color: #f0f0f0;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        /* Loading spinner */
+        .loading-spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
+    <!-- Debug Info - hapus setelah debugging -->
+    <?php if (isset($_GET['debug']) && $_GET['debug'] == 1): ?>
+    <div style="padding: 10px; background: #ffefef; border: 1px solid #ffcaca; margin: 10px;">
+        <h3>Debug Info:</h3>
+        <p>Upload directory exists: <?php echo $is_dir_exists ? 'Yes' : 'No'; ?></p>
+        <p>Upload directory readable: <?php echo $is_dir_readable ? 'Yes' : 'No'; ?></p>
+        <?php
+        if ($is_dir_exists && $is_dir_readable) {
+            echo "<p>Files in upload directory:</p><ul>";
+            $files = scandir($upload_dir);
+            foreach ($files as $file) {
+                if ($file != "." && $file != "..") {
+                    echo "<li>" . htmlspecialchars($file) . "</li>";
+                }
+            }
+            echo "</ul>";
+        }
+        ?>
+    </div>
+    <?php endif; ?>
+    
     <!-- Navbar -->
     <div class="nav-wrapper">
         <div class="navbar">
@@ -69,9 +135,9 @@ $category_result = mysqli_query($conn, $category_query);
                 <span>LibraryKu</span>
             </a>
             <div class="nav-links">
-                <a href="#"><i class="fas fa-home"></i> Beranda</a>
-                <a href="#"><i class="fas fa-book"></i> Katalog</a>
-                <a href="#"><i class="fas fa-history"></i> Peminjaman</a>
+                <a href="dashboard.php"><i class="fas fa-home"></i> Beranda</a>
+                <a href="catalog.php" class="active"><i class="fas fa-book"></i> Katalog</a>
+                <a href="borrowed.php"><i class="fas fa-history"></i> Peminjaman</a>
                 <a href="#"><i class="fas fa-info-circle"></i> Tentang</a>
             </div>
             <div class="user-menu">
@@ -91,7 +157,7 @@ $category_result = mysqli_query($conn, $category_query);
         <div class="header-content">
             <h1>Temukan Buku Impianmu</h1>
             <p>Jelajahi ribuan koleksi buku dari berbagai genre dan penulis favorit</p>
-            <form action="" method="GET" class="search-bar">
+            <form action="catalog.php" method="GET" class="search-bar">
                 <input type="text" name="search" placeholder="Cari judul buku atau penulis..." value="<?php echo htmlspecialchars($search); ?>">
                 <button type="submit"><i class="fas fa-search"></i></button>
             </form>
@@ -101,31 +167,37 @@ $category_result = mysqli_query($conn, $category_query);
     <!-- Main Content -->
     <div class="container">
         <!-- Filters -->
-        <div class="filters">
-            <div class="filter-group">
-                <label for="category">Kategori:</label>
-                <select name="category" id="category" onchange="this.form.submit()">
-                    <option value="">Semua Kategori</option>
-                    <?php while ($cat = mysqli_fetch_assoc($category_result)): ?>
-                        <option value="<?php echo htmlspecialchars($cat['category']); ?>" <?php echo ($category == $cat['category']) ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($cat['category']); ?>
-                        </option>
-                    <?php endwhile; ?>
-                </select>
+        <form action="catalog.php" method="GET">
+            <?php if (!empty($search)): ?>
+                <input type="hidden" name="search" value="<?php echo htmlspecialchars($search); ?>">
+            <?php endif; ?>
+            
+            <div class="filters">
+                <div class="filter-group">
+                    <label for="category">Kategori:</label>
+                    <select name="category" id="category" onchange="this.form.submit()">
+                        <option value="">Semua Kategori</option>
+                        <?php while ($cat = mysqli_fetch_assoc($category_result)): ?>
+                            <option value="<?php echo htmlspecialchars($cat['category']); ?>" <?php echo ($category == $cat['category']) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($cat['category']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="sort">Urutkan:</label>
+                    <select name="sort" id="sort" onchange="this.form.submit()">
+                        <option value="title_asc" <?php echo ($sort == 'title_asc') ? 'selected' : ''; ?>>Judul (A-Z)</option>
+                        <option value="title_desc" <?php echo ($sort == 'title_desc') ? 'selected' : ''; ?>>Judul (Z-A)</option>
+                        <option value="author_asc" <?php echo ($sort == 'author_asc') ? 'selected' : ''; ?>>Penulis (A-Z)</option>
+                        <option value="newest" <?php echo ($sort == 'newest') ? 'selected' : ''; ?>>Terbaru</option>
+                    </select>
+                </div>
+                <div class="book-count">
+                    <?php echo mysqli_num_rows($result); ?> buku ditemukan
+                </div>
             </div>
-            <div class="filter-group">
-                <label for="sort">Urutkan:</label>
-                <select name="sort" id="sort" onchange="this.form.submit()">
-                    <option value="title_asc" <?php echo ($sort == 'title_asc') ? 'selected' : ''; ?>>Judul (A-Z)</option>
-                    <option value="title_desc" <?php echo ($sort == 'title_desc') ? 'selected' : ''; ?>>Judul (Z-A)</option>
-                    <option value="author_asc" <?php echo ($sort == 'author_asc') ? 'selected' : ''; ?>>Penulis (A-Z)</option>
-                    <option value="newest" <?php echo ($sort == 'newest') ? 'selected' : ''; ?>>Terbaru</option>
-                </select>
-            </div>
-            <div class="book-count">
-                <?php echo mysqli_num_rows($result); ?> buku ditemukan
-            </div>
-        </div>
+        </form>
         
         <!-- Book Catalog -->
         <div class="katalog-container">
@@ -161,17 +233,31 @@ $category_result = mysqli_query($conn, $category_query);
                             $is_new = true;
                         }
                     }
+                    
+                    // Periksa path gambar
+                    $image_path = 'uploads/' . $book['cover'];
+                    $default_image = 'default_cover.jpg';
+                    
+                    // Verifikasi file gambar ada
+                    $image_exists = !empty($book['cover']) && file_exists($image_path);
             ?>
                 <div class="book-card">
                     <?php if ($is_new): ?>
                         <div class="ribbon">Baru</div>
                     <?php endif; ?>
                     
-                    <?php if ($book['cover']): ?>
-                        <img src="uploads/<?php echo htmlspecialchars($book['cover']); ?>" alt="<?php echo htmlspecialchars($book['title']); ?>">
-                    <?php else: ?>
-                        <img src="default_cover.jpg" alt="No Cover Available">
-                    <?php endif; ?>
+                    <div class="image-container">
+                        <?php if ($image_exists): ?>
+                            <img src="<?php echo $image_path; ?>?v=<?php echo time(); ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" 
+                                onload="this.style.display='block'" 
+                                onerror="this.onerror=null; this.src='<?php echo $default_image; ?>'; this.parentNode.innerHTML='<div style=\'text-align:center; padding:20px;\'><i class=\'fas fa-image\' style=\'font-size:50px; color:#ddd;\'></i><p style=\'margin-top:10px;\'>Gambar tidak tersedia</p></div>'">
+                        <?php else: ?>
+                            <div style="text-align:center; padding:20px;">
+                                <i class="fas fa-image" style="font-size:50px; color:#ddd;"></i>
+                                <p style="margin-top:10px;">Gambar tidak tersedia</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                     
                     <div class="book-info">
                         <span class="book-category"><?php echo htmlspecialchars($book['category']); ?></span>
@@ -205,7 +291,7 @@ $category_result = mysqli_query($conn, $category_query);
                     <i class="fas fa-search" style="font-size: 4rem; color: #ccc; margin-bottom: 1rem;"></i>
                     <h2>Buku tidak ditemukan</h2>
                     <p>Silakan coba dengan kata kunci lain atau reset filter</p>
-                    <button class="detail-btn" style="margin-top: 1rem; padding: 0.5rem 1rem;" onclick="location.href='katalog.php'">
+                    <button class="detail-btn" style="margin-top: 1rem; padding: 0.5rem 1rem;" onclick="location.href='catalog.php'">
                         Reset Filter
                     </button>
                 </div>
@@ -265,6 +351,23 @@ $category_result = mysqli_query($conn, $category_query);
     </div>
     
     <script>
+        // Periksa apakah semua gambar telah dimuat dengan benar
+        document.addEventListener('DOMContentLoaded', function() {
+            // Periksa semua gambar buku
+            const bookImages = document.querySelectorAll('.image-container img');
+            bookImages.forEach(img => {
+                // Tambahkan event listener untuk load dan error
+                img.addEventListener('load', function() {
+                    console.log('Image loaded successfully:', this.src);
+                });
+                
+                img.addEventListener('error', function() {
+                    console.log('Image failed to load:', this.src);
+                    // Gambar sudah ditangani oleh atribut onerror
+                });
+            });
+        });
+    
         // Fungsi untuk menambahkan buku ke wishlist
         function addToWishlist(bookId) {
             // Tambahkan animasi
@@ -279,8 +382,8 @@ $category_result = mysqli_query($conn, $category_query);
             // xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
             // xhr.send('book_id=' + bookId);
             
-          // Tampilkan notifikasi
-          alert('Buku telah ditambahkan ke wishlist Anda!');
+            // Tampilkan notifikasi
+            alert('Buku telah ditambahkan ke wishlist Anda!');
         }
         
         // Animasi untuk scroll
@@ -319,17 +422,16 @@ $category_result = mysqli_query($conn, $category_query);
                 const categoryValue = categorySelect.value;
                 const sortValue = sortSelect.value;
                 
-                let url = 'katalog.php?';
+                let url = 'catalog.php?';
                 if (searchValue) url += `search=${searchValue}&`;
                 if (categoryValue) url += `category=${categoryValue}&`;
                 if (sortValue) url += `sort=${sortValue}`;
                 
                 // Menambahkan efek loading
                 document.querySelector('.katalog-container').innerHTML = `
-                    <div class="loading" style="grid-column: 1 / -1;">
-                        <span></span>
-                        <span></span>
-                        <span></span>
+                    <div class="loading" style="grid-column: 1 / -1; text-align: center; padding: 20px;">
+                        <div class="loading-spinner"></div>
+                        <p>Memuat buku...</p>
                     </div>
                 `;
                 

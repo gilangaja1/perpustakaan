@@ -16,7 +16,6 @@ $user_query = mysqli_stmt_get_result($stmt);
 $user = mysqli_fetch_assoc($user_query);
 $user_id = $user['id'];
 
-// Modified query to show all books including newly added ones
 // Now we only filter books that have at least 1 in stock
 $query = "SELECT * FROM books WHERE stock > 0 ORDER BY title ASC";
 $result = mysqli_query($conn, $query);
@@ -247,396 +246,483 @@ $total_books = mysqli_num_rows($result);
     </div>
 
     <script>
-    function searchBooks() {
-        const input = document.getElementById('searchInput').value.toLowerCase();
-        const bookCards = document.querySelectorAll('.book-card');
+   function searchBooks() {
+    const input = document.getElementById('searchInput').value.toLowerCase();
+    const bookCards = document.querySelectorAll('.book-card');
+    
+    bookCards.forEach(card => {
+        const title = card.querySelector('.book-title').textContent.toLowerCase();
+        const author = card.querySelector('.book-author').textContent.toLowerCase();
         
-        bookCards.forEach(card => {
-            const title = card.querySelector('.book-title').textContent.toLowerCase();
-            const author = card.querySelector('.book-author').textContent.toLowerCase();
-            
-            if (title.includes(input) || author.includes(input)) {
-                card.style.display = 'block';
-            } else {
-                card.style.display = 'none';
-            }
-        });
-    }
-
-    function updateCountdown() {
-        document.querySelectorAll('.countdown').forEach(element => {
-            const returnDate = new Date(element.dataset.returnDate).getTime();
-            const now = new Date().getTime();
-            const distance = returnDate - now;
-
-            if (distance < 0) {
-                element.innerHTML = "⚠️ Waktu pengembalian telah habis!";
-                return;
-            }
-
-            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-            element.querySelector('.countdown-timer').innerHTML = 
-                `${days} hari ${hours} jam ${minutes} menit ${seconds} detik`;
-        });
-    }
-
-    // Event Listeners
-    document.getElementById('searchInput').addEventListener('keyup', searchBooks);
-    setInterval(updateCountdown, 1000);
-    updateCountdown();
-
-    // Checkout Modal Functions
-    const modal = document.getElementById('checkoutModal');
-    const closeBtn = document.querySelector('.close');
-    const cancelBtn = document.getElementById('cancelCheckout');
-    let currentBookId;
-
-    // Fungsi untuk format tanggal dengan format Indonesia
-    function formatDate(date) {
-        const options = { day: 'numeric', month: 'short', year: 'numeric' };
-        return date.toLocaleDateString('id-ID', options);
-    }
-
-    // Event for checkout buttons
-    document.querySelectorAll('.checkout-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            // Get book data from button attributes
-            const bookId = this.dataset.bookId;
-            const title = this.dataset.title;
-            const author = this.dataset.author;
-            const cover = this.dataset.cover;
-            const category = this.dataset.category;
-            const stock = this.dataset.stock;
-            
-            // Set current book ID
-            currentBookId = bookId;
-            
-            // Fill modal with book info
-            document.getElementById('checkoutTitle').textContent = title;
-            document.getElementById('checkoutAuthor').textContent = 'Oleh: ' + author;
-            document.getElementById('checkoutCategory').textContent = 'Kategori: ' + category;
-            document.getElementById('checkoutStock').textContent = stock;
-            
-            // Set cover image if available
-            const coverElement = document.getElementById('checkoutCover');
-            if (cover) {
-                coverElement.innerHTML = `<img src="uploads/${cover}" alt="Sampul Buku">`;
-            } else {
-                coverElement.innerHTML = `<i class="fas fa-book"></i>`;
-            }
-            
-            // Perbarui tanggal peminjaman dan pengembalian (hari ini + 7 hari)
-            const today = new Date();
-            const returnDate = new Date(today);
-            returnDate.setDate(today.getDate() + 7);
-            
-            document.getElementById('checkoutBorrowDate').textContent = formatDate(today);
-            document.getElementById('checkoutReturnDate').textContent = formatDate(returnDate);
-            
-            // Show modal
-            modal.classList.add('show');
-        });
-    });
-
-    // Close modal on close button click
-    closeBtn.addEventListener('click', function() {
-        modal.classList.remove('show');
-    });
-
-    // Close modal on cancel button click
-    cancelBtn.addEventListener('click', function() {
-        modal.classList.remove('show');
-    });
-
-    // Close modal when clicking outside of it
-    window.addEventListener('click', function(event) {
-        if (event.target === modal) {
-            modal.classList.remove('show');
+        if (title.includes(input) || author.includes(input)) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
         }
     });
+}
 
-    // Confirm borrowing (Diperbaiki)
-    document.getElementById('confirmBorrow').addEventListener('click', function() {
-        if (!currentBookId) return;
+function updateCountdown() {
+    document.querySelectorAll('.countdown').forEach(element => {
+        const returnDate = new Date(element.dataset.returnDate).getTime();
+        const now = new Date().getTime();
+        const distance = returnDate - now;
+
+        if (distance < 0) {
+            element.innerHTML = "⚠️ Waktu pengembalian telah habis!";
+            return;
+        }
+
+        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+        element.querySelector('.countdown-timer').innerHTML = 
+            `${days} hari ${hours} jam ${minutes} menit ${seconds} detik`;
+    });
+}
+
+// Event Listeners
+document.getElementById('searchInput').addEventListener('keyup', searchBooks);
+setInterval(updateCountdown, 1000);
+updateCountdown();
+
+// Checkout Modal Functions
+const modal = document.getElementById('checkoutModal');
+const closeBtn = document.querySelector('.close');
+const cancelBtn = document.getElementById('cancelCheckout');
+let currentBookId;
+
+// Fungsi untuk format tanggal dengan format Indonesia
+function formatDate(date) {
+    const options = { day: 'numeric', month: 'short', year: 'numeric' };
+    return date.toLocaleDateString('id-ID', options);
+}
+
+// Event for checkout buttons
+document.querySelectorAll('.checkout-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        // Get book data from button attributes
+        const bookId = this.dataset.bookId;
+        const title = this.dataset.title;
+        const author = this.dataset.author;
+        const cover = this.dataset.cover;
+        const category = this.dataset.category;
+        const stock = this.dataset.stock;
         
-        // Tampilkan loading pada tombol
-        const confirmBtn = document.getElementById('confirmBorrow');
-        const originalText = confirmBtn.innerHTML;
-        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses...';
-        confirmBtn.disabled = true;
+        // Set current book ID
+        currentBookId = bookId;
         
-        fetch('pinjam_buku.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'book_id=' + currentBookId
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Close modal first
-            modal.classList.remove('show');
-            confirmBtn.innerHTML = originalText;
-            confirmBtn.disabled = false;
+        // Fill modal with book info
+        document.getElementById('checkoutTitle').textContent = title;
+        document.getElementById('checkoutAuthor').textContent = 'Oleh: ' + author;
+        document.getElementById('checkoutCategory').textContent = 'Kategori: ' + category;
+        document.getElementById('checkoutStock').textContent = stock;
+        
+        // Set cover image if available
+        const coverElement = document.getElementById('checkoutCover');
+        if (cover) {
+            coverElement.innerHTML = `<img src="uploads/${cover}" alt="Sampul Buku">`;
+        } else {
+            coverElement.innerHTML = `<i class="fas fa-book"></i>`;
+        }
+        
+        // Perbarui tanggal peminjaman dan pengembalian (hari ini + 7 hari)
+        const today = new Date();
+        const returnDate = new Date(today);
+        returnDate.setDate(today.getDate() + 7);
+        
+        document.getElementById('checkoutBorrowDate').textContent = formatDate(today);
+        document.getElementById('checkoutReturnDate').textContent = formatDate(returnDate);
+        
+        // Show modal
+        modal.classList.add('show');
+    });
+});
+
+// Close modal on close button click
+closeBtn.addEventListener('click', function() {
+    modal.classList.remove('show');
+});
+
+// Close modal on cancel button click
+cancelBtn.addEventListener('click', function() {
+    modal.classList.remove('show');
+});
+
+// Close modal when clicking outside of it
+window.addEventListener('click', function(event) {
+    if (event.target === modal) {
+        modal.classList.remove('show');
+    }
+});
+
+// Confirm borrowing
+document.getElementById('confirmBorrow').addEventListener('click', function() {
+    if (!currentBookId) return;
+    
+    // Tampilkan loading pada tombol
+    const confirmBtn = document.getElementById('confirmBorrow');
+    const originalText = confirmBtn.innerHTML;
+    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses...';
+    confirmBtn.disabled = true;
+    
+    fetch('pinjam_buku.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'book_id=' + currentBookId
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Close modal first
+        modal.classList.remove('show');
+        confirmBtn.innerHTML = originalText;
+        confirmBtn.disabled = false;
+        
+        if (data.success) {
+            // Update book card UI
+            const bookCard = document.querySelector(`.checkout-btn[data-book-id="${currentBookId}"]`).closest('.book-card');
+            const stockBadge = bookCard.querySelector('.stock-badge');
             
-            if (data.success) {
-                // Update book card UI
-                const bookCard = document.querySelector(`.checkout-btn[data-book-id="${currentBookId}"]`).closest('.book-card');
-                const stockBadge = bookCard.querySelector('.stock-badge');
-                
-                // Update stock displaytt
-                let newStock = parseInt(stockBadge.textContent.replace('Stok: ', '')) - 1;
-                stockBadge.textContent = 'Stok: ' + newStock;
-                
-                // Disable button if stock is depleted
-                if (newStock <= 0) {
-                    const checkoutBtn = bookCard.querySelector('.checkout-btn');
-                    checkoutBtn.disabled = true;
-                    checkoutBtn.textContent = 'Stok Habis';
-                    checkoutBtn.style.backgroundColor = 'gray';
-                }
-                
-                // Show success message
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Berhasil!',
-                    text: data.message || 'Buku berhasil dipinjam!',
-                    confirmButtonText: 'OK'
-                }).then(() => {
-                    // Refresh page to show new loan
-                    location.reload();
-                });
-            } else {
-                // Show error message
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Gagal!',
-                    text: data.message || 'Gagal meminjam buku. Silakan coba lagi.',
-                    confirmButtonText: 'Coba lagi'
-                });
+            // Update stock display
+            let newStock = parseInt(stockBadge.textContent.replace('Stok: ', '')) - 1;
+            stockBadge.textContent = 'Stok: ' + newStock;
+            
+            // Disable button if stock is depleted
+            if (newStock <= 0) {
+                const checkoutBtn = bookCard.querySelector('.checkout-btn');
+                checkoutBtn.disabled = true;
+                checkoutBtn.textContent = 'Stok Habis';
+                checkoutBtn.style.backgroundColor = 'gray';
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            confirmBtn.innerHTML = originalText;
-            confirmBtn.disabled = false;
             
+            // Show success message
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil!',
+                text: data.message || 'Buku berhasil dipinjam!',
+                confirmButtonText: 'OK'
+            }).then(() => {
+                // Refresh page to show new loan
+                location.reload();
+            });
+        } else {
+            // Show error message
             Swal.fire({
                 icon: 'error',
-                title: 'Error!',
-                text: 'Terjadi kesalahan saat memproses permintaan Anda',
-                confirmButtonText: 'OK'
-            });
-        });
-    });
-
-    // Fungsi untuk membaca buku
-    let currentBookPages = [];
-    let currentPageIndex = 0;
-
-    function readBook(bookId, title) {
-        // Siapkan modal
-        document.getElementById('readerTitle').textContent = title;
-        document.getElementById('currentPage').textContent = '1';
-        document.getElementById('bookContent').innerHTML = '<div class="loading-container"><div class="loading-spinner"></div><p>Memuat konten buku...</p></div>';
-        
-        // Tampilkan modal
-        const readerModal = document.getElementById('readerModal');
-        readerModal.classList.add('show');
-        
-        // Tambahkan listener untuk tombol close di sini
-        const closeReaderBtn = document.getElementById('closeReader');
-        if (closeReaderBtn) {
-            closeReaderBtn.addEventListener('click', function() {
-                readerModal.classList.remove('show');
+                title: 'Gagal!',
+                text: data.message || 'Gagal meminjam buku. Silakan coba lagi.',
+                confirmButtonText: 'Coba lagi'
             });
         }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        confirmBtn.innerHTML = originalText;
+        confirmBtn.disabled = false;
         
-        // Ambil konten buku dari server
-        fetch('get_book_content.php?book_id=' + bookId)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Simpan konten buku dalam array halaman
-                    currentBookPages = data.content;
-                    currentPageIndex = 0;
-                    
-                    // Tampilkan halaman pertama
-                    document.getElementById('bookContent').innerHTML = currentBookPages[0];
-                    document.getElementById('totalPages').textContent = currentBookPages.length;
-                    
-                    // Cek bookmark jika ada
-                    const bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '{}');
-                    if (bookmarks[bookId]) {
-                        currentPageIndex = bookmarks[bookId];
-                        document.getElementById('currentPage').textContent = currentPageIndex + 1;
-                        document.getElementById('bookContent').innerHTML = currentBookPages[currentPageIndex];
+        Swal.fire({
+            icon: 'error',
+            title: 'Error!',
+            text: 'Terjadi kesalahan saat memproses permintaan Anda',
+            confirmButtonText: 'OK'
+        });
+    });
+});
+
+// ----- FITUR BACA BUKU YANG SUDAH DIPERBAIKI -----
+// Variabel untuk menyimpan state pembaca buku
+let currentBookPages = [];
+let currentPageIndex = 0;
+let currentFontSize = 16; // default font size in pixels
+
+// Fungsi untuk membaca buku
+function readBook(bookId, title) {
+    // Reset state
+    currentBookPages = [];
+    currentPageIndex = 0;
+    document.getElementById('bookContent').style.fontSize = currentFontSize + 'px';
+    
+    // Siapkan modal
+    document.getElementById('readerTitle').textContent = title;
+    document.getElementById('currentPage').textContent = '1';
+    document.getElementById('bookContent').innerHTML = '<div class="loading-container"><div class="loading-spinner"></div><p>Memuat konten buku...</p></div>';
+    
+    // Atur tema default
+    const readerBody = document.getElementById('bookContent');
+    readerBody.className = 'reader-body light-theme';
+    document.getElementById('themeSelector').value = 'light';
+    
+    // Tampilkan modal
+    const readerModal = document.getElementById('readerModal');
+    readerModal.classList.add('show');
+    
+    // Tambahkan listener untuk tombol close di sini
+    const closeReaderBtn = document.getElementById('closeReader');
+    if (closeReaderBtn) {
+        closeReaderBtn.addEventListener('click', function() {
+            readerModal.classList.remove('show');
+        });
+    }
+    
+    // Ambil konten buku dari server
+    fetch('get_book_content.php?book_id=' + bookId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Simpan konten buku dalam array halaman
+                currentBookPages = data.content;
+                document.getElementById('totalPages').textContent = currentBookPages.length;
+                
+                // Cek bookmark jika ada
+                const bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '{}');
+                if (bookmarks[bookId]) {
+                    const savedPage = parseInt(bookmarks[bookId]);
+                    // Validasi halaman yang tersimpan
+                    if (savedPage >= 0 && savedPage < currentBookPages.length) {
+                        currentPageIndex = savedPage;
                         
                         // Tampilkan notifikasi
                         Swal.fire({
                             toast: true,
                             position: 'top-end',
                             icon: 'info',
-                            title: 'Lanjutkan membaca dari halaman terakhir Anda',
+                            title: 'Melanjutkan dari halaman terakhir Anda',
                             showConfirmButton: false,
                             timer: 3000
                         });
                     }
-                } else {
-                    document.getElementById('bookContent').innerHTML = 
-                        '<div class="error"><i class="fas fa-exclamation-circle"></i> ' + 
-                        data.message + '</div>';
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
+                
+                // Tampilkan halaman
+                document.getElementById('currentPage').textContent = currentPageIndex + 1;
+                document.getElementById('bookContent').innerHTML = currentBookPages[currentPageIndex];
+                updateProgressBar();
+            } else {
                 document.getElementById('bookContent').innerHTML = 
                     '<div class="error"><i class="fas fa-exclamation-circle"></i> ' + 
-                    'Gagal memuat konten buku. Silakan coba lagi nanti.</div>';
-            });
-    }
+                    data.message + '</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('bookContent').innerHTML = 
+                '<div class="error"><i class="fas fa-exclamation-circle"></i> ' + 
+                'Gagal memuat konten buku. Silakan coba lagi nanti.</div>';
+        });
+}
 
-    // Navigasi halaman
-    document.getElementById('prevPage').addEventListener('click', function() {
-        if (currentPageIndex > 0) {
-            currentPageIndex--;
-            document.getElementById('currentPage').textContent = currentPageIndex + 1;
-            document.getElementById('bookContent').innerHTML = currentBookPages[currentPageIndex];
-            updateProgressBar();
-        }
-    });
-
-    document.getElementById('nextPage').addEventListener('click', function() {
-        if (currentPageIndex < currentBookPages.length - 1) {
-            currentPageIndex++;
-            document.getElementById('currentPage').textContent = currentPageIndex + 1;
-            document.getElementById('bookContent').innerHTML = currentBookPages[currentPageIndex];
-            updateProgressBar();
-        }
-    });
-
-    // Update progress bar
-    function updateProgressBar() {
+// Update progress bar
+function updateProgressBar() {
+    if (currentBookPages.length > 0) {
         const progress = ((currentPageIndex + 1) / currentBookPages.length) * 100;
         document.getElementById('readingProgress').style.width = progress + '%';
+    } else {
+        document.getElementById('readingProgress').style.width = '0%';
     }
+}
 
-    // Bookmark halaman
-    document.getElementById('bookmarkPage').addEventListener('click', function() {
-        if (currentBookPages.length > 0) {
-            // Get bookId from current active button or element with data
-            let bookId;
-            const readButton = document.querySelector('.btn-read[onclick*="readBook"]');
-            if (readButton) {
-                const match = readButton.getAttribute('onclick').match(/readBook\((\d+)/);
-                if (match && match[1]) {
-                    bookId = match[1];
+// Navigasi halaman
+document.getElementById('prevPage').addEventListener('click', function() {
+    if (currentPageIndex > 0) {
+        currentPageIndex--;
+        document.getElementById('currentPage').textContent = currentPageIndex + 1;
+        document.getElementById('bookContent').innerHTML = currentBookPages[currentPageIndex];
+        updateProgressBar();
+    }
+});
+
+document.getElementById('nextPage').addEventListener('click', function() {
+    if (currentPageIndex < currentBookPages.length - 1) {
+        currentPageIndex++;
+        document.getElementById('currentPage').textContent = currentPageIndex + 1;
+        document.getElementById('bookContent').innerHTML = currentBookPages[currentPageIndex];
+        updateProgressBar();
+    }
+});
+
+// Bookmark halaman
+document.getElementById('bookmarkPage').addEventListener('click', function() {
+    if (currentBookPages.length > 0) {
+        // Get bookId from current active button or element with data
+        let bookId;
+        const readButton = document.querySelector('.btn-read[onclick*="readBook"]');
+        if (readButton) {
+            const match = readButton.getAttribute('onclick').match(/readBook\((\d+)/);
+            if (match && match[1]) {
+                bookId = match[1];
+            }
+        }
+        
+        if (bookId) {
+            // Simpan bookmark di localStorage
+            const bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '{}');
+            bookmarks[bookId] = currentPageIndex;
+            localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
+            
+            // Tampilkan konfirmasi
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: 'Halaman ditandai!',
+                showConfirmButton: false,
+                timer: 1500
+            });
+        }
+    }
+});
+
+// Toggle fullscreen
+document.getElementById('toggleFullscreen').addEventListener('click', function() {
+    const readerContent = document.querySelector('.reader-content');
+    
+    if (!document.fullscreenElement) {
+        if (readerContent.requestFullscreen) {
+            readerContent.requestFullscreen();
+        } else if (readerContent.mozRequestFullScreen) {
+            readerContent.mozRequestFullScreen();
+        } else if (readerContent.webkitRequestFullscreen) {
+            readerContent.webkitRequestFullscreen();
+        } else if (readerContent.msRequestFullscreen) {
+            readerContent.msRequestFullscreen();
+        }
+        this.innerHTML = '<i class="fas fa-compress"></i>';
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+        this.innerHTML = '<i class="fas fa-expand"></i>';
+    }
+});
+
+// Font size adjustment
+let fontSizeChanged = false;
+
+document.getElementById('increaseFontSize').addEventListener('click', function() {
+    if (currentFontSize < 24) {
+        currentFontSize += 2;
+        document.getElementById('bookContent').style.fontSize = currentFontSize + 'px';
+        fontSizeChanged = true;
+    }
+});
+
+document.getElementById('decreaseFontSize').addEventListener('click', function() {
+    if (currentFontSize > 12) {
+        currentFontSize -= 2;
+        document.getElementById('bookContent').style.fontSize = currentFontSize + 'px';
+        fontSizeChanged = true;
+    }
+});
+
+// Theme selection
+document.getElementById('themeSelector').addEventListener('change', function() {
+    const readerBody = document.getElementById('bookContent');
+    const theme = this.value;
+    
+    // Remove all theme classes
+    readerBody.classList.remove('light-theme', 'dark-theme', 'sepia-theme');
+    
+    // Add selected theme class
+    if (theme === 'dark') {
+        readerBody.classList.add('dark-theme');
+    } else if (theme === 'sepia') {
+        readerBody.classList.add('sepia-theme');
+    } else {
+        readerBody.classList.add('light-theme');
+    }
+    
+    // Simpan preferensi tema di localStorage
+    localStorage.setItem('readerTheme', theme);
+});
+
+// Menambahkan keyboard navigation
+document.addEventListener('keydown', function(event) {
+    const readerModal = document.getElementById('readerModal');
+    
+    // Hanya berfungsi jika modal reader sedang aktif/terbuka
+    if (readerModal.classList.contains('show')) {
+        switch(event.key) {
+            case 'ArrowLeft':
+                // Halaman sebelumnya
+                if (currentPageIndex > 0) {
+                    currentPageIndex--;
+                    document.getElementById('currentPage').textContent = currentPageIndex + 1;
+                    document.getElementById('bookContent').innerHTML = currentBookPages[currentPageIndex];
+                    updateProgressBar();
                 }
-            }
-            
-            if (bookId) {
-                // Simpan bookmark di localStorage
-                const bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '{}');
-                bookmarks[bookId] = currentPageIndex;
-                localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
-                
-                // Tampilkan konfirmasi
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'success',
-                    title: 'Halaman ditandai!',
-                    showConfirmButton: false,
-                    timer: 1500
-                });
-            }
-        }
-    });
-
-    // Toggle fullscreen
-    document.getElementById('toggleFullscreen').addEventListener('click', function() {
-        const readerContent = document.querySelector('.reader-content');
-        
-        if (!document.fullscreenElement) {
-            if (readerContent.requestFullscreen) {
-                readerContent.requestFullscreen();
-            } else if (readerContent.mozRequestFullScreen) {
-                readerContent.mozRequestFullScreen();
-            } else if (readerContent.webkitRequestFullscreen) {
-                readerContent.webkitRequestFullscreen();
-            } else if (readerContent.msRequestFullscreen) {
-                readerContent.msRequestFullscreen();
-            }
-            this.innerHTML = '<i class="fas fa-compress"></i>';
-        } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.mozCancelFullScreen) {
-                document.mozCancelFullScreen();
-            } else if (document.webkitExitFullscreen) {
-                document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) {
-                document.msExitFullscreen();
-            }
-            this.innerHTML = '<i class="fas fa-expand"></i>';
-        }
-    });
-
-    // Font size adjustment
-    let currentFontSize = 16; // default font size in pixels
-    
-    document.getElementById('increaseFontSize').addEventListener('click', function() {
-        if (currentFontSize < 24) {
-            currentFontSize += 2;
-            document.getElementById('bookContent').style.fontSize = currentFontSize + 'px';
-        }
-    });
-    
-    document.getElementById('decreaseFontSize').addEventListener('click', function() {
-        if (currentFontSize > 12) {
-            currentFontSize -= 2;
-            document.getElementById('bookContent').style.fontSize = currentFontSize + 'px';
-        }
-    });
-    
-    // Theme selection
-    document.getElementById('themeSelector').addEventListener('change', function() {
-        const readerBody = document.getElementById('bookContent');
-        const theme = this.value;
-        
-        // Remove all theme classes
-        readerBody.classList.remove('light-theme', 'dark-theme', 'sepia-theme');
-        
-        // Add selected theme class
-        if (theme === 'dark') {
-            readerBody.classList.add('dark-theme');
-        } else if (theme === 'sepia') {
-            readerBody.classList.add('sepia-theme');
-        } else {
-            readerBody.classList.add('light-theme');
-        }
-    });
-
-    // Perbaikan event listener untuk tombol close pada reader modal
-    document.addEventListener('DOMContentLoaded', function() {
-        // Tambahkan global event listener untuk tombol close
-        document.body.addEventListener('click', function(event) {
-            const closeReaderBtn = document.getElementById('closeReader');
-            const readerModal = document.getElementById('readerModal');
-            
-            // Cek jika yang diklik adalah tombol close
-            if (event.target === closeReaderBtn) {
+                break;
+            case 'ArrowRight':
+                // Halaman berikutnya
+                if (currentPageIndex < currentBookPages.length - 1) {
+                    currentPageIndex++;
+                    document.getElementById('currentPage').textContent = currentPageIndex + 1;
+                    document.getElementById('bookContent').innerHTML = currentBookPages[currentPageIndex];
+                    updateProgressBar();
+                }
+                break;
+            case 'Escape':
+                // Tutup modal
                 readerModal.classList.remove('show');
-            }
-            
-            // Juga tutup modal jika mengklik di luar area konten modal
-            if (event.target === readerModal) {
-                readerModal.classList.remove('show');
-            }
+                break;
+            case 'b':
+                // Bookmark halaman
+                document.getElementById('bookmarkPage').click();
+                break;
+            case 'f':
+                // Toggle fullscreen
+                document.getElementById('toggleFullscreen').click();
+                break;
+        }
+    }
+});
+
+// Perbaikan event listener untuk tombol close dan klik di luar modal
+document.addEventListener('DOMContentLoaded', function() {
+    // Tutup reader modal saat klik tombol close
+    const closeReaderBtn = document.getElementById('closeReader');
+    const readerModal = document.getElementById('readerModal');
+    
+    if (closeReaderBtn && readerModal) {
+        closeReaderBtn.addEventListener('click', function() {
+            readerModal.classList.remove('show');
         });
+    }
+    
+    // Tutup reader modal saat klik di luar area konten
+    readerModal.addEventListener('click', function(event) {
+        if (event.target === readerModal) {
+            readerModal.classList.remove('show');
+        }
     });
+    
+    // Memuat preferensi tema yang tersimpan
+    const savedTheme = localStorage.getItem('readerTheme');
+    if (savedTheme) {
+        document.getElementById('themeSelector').value = savedTheme;
+    }
+    
+    // Memuat preferensi ukuran font yang tersimpan
+    const savedFontSize = localStorage.getItem('readerFontSize');
+    if (savedFontSize) {
+        currentFontSize = parseInt(savedFontSize);
+    }
+    
+    // Simpan font size di localStorage saat pengguna keluar dari reader
+    readerModal.addEventListener('hide', function() {
+        if (fontSizeChanged) {
+            localStorage.setItem('readerFontSize', currentFontSize);
+            fontSizeChanged = false;
+        }
+    });
+});
     </script>
 </body>
 </html>

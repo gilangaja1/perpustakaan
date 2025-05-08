@@ -300,7 +300,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">
+                            <a class="nav-link" href="borrow_history.php">
                                 <i class="fas fa-exchange-alt"></i> Peminjaman
                             </a>
                         </li>

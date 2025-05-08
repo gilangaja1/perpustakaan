@@ -41,6 +41,17 @@ if (!$user) {
 
 $user_id = $user['id'];
 
+// FITUR BARU: Cek apakah user sudah meminjam buku yang sama dan belum dikembalikan
+$check_existing = mysqli_prepare($conn, "SELECT id FROM borrows WHERE user_id = ? AND book_id = ? AND status = 'borrowed'");
+mysqli_stmt_bind_param($check_existing, "ii", $user_id, $book_id);
+mysqli_stmt_execute($check_existing);
+$existing_result = mysqli_stmt_get_result($check_existing);
+
+if (mysqli_num_rows($existing_result) > 0) {
+    echo json_encode(['success' => false, 'message' => 'Anda sudah meminjam buku ini. Harap kembalikan buku sebelum meminjam kembali.']);
+    exit();
+}
+
 // Siapkan tanggal peminjaman dan pengembalian
 $tanggal_pinjam = date('Y-m-d');
 $tanggal_kembali = date('Y-m-d', strtotime($tanggal_pinjam . ' +7 days'));

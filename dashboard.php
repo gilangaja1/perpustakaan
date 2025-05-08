@@ -13,7 +13,6 @@ if (!isset($_SESSION['user_id'])) {
 }
 $user_id = $_SESSION['user_id'];
 
-// With this:
 if (!isset($_SESSION['username'])) {
     header("Location: login.php");
     exit();
@@ -42,6 +41,36 @@ $borrowed_query = "SELECT b.*, b.cover_image, br.borrow_date, br.return_date,
 
 // Jalankan kueri yang diperbarui
 $borrowed_result = mysqli_query($conn, $borrowed_query);
+
+// 1. Tambahkan perhitungan denda pada bagian sebelum tag DOCTYPE html
+$fine_rate_per_day = 2000; // Rp 2.000 per hari
+
+// Hitung total denda untuk pengguna saat ini
+$fine_query = "SELECT SUM(
+                CASE 
+                    WHEN br.status = 'borrowed' AND br.return_date < CURDATE() 
+                    THEN DATEDIFF(CURDATE(), br.return_date) * $fine_rate_per_day
+                    ELSE 0
+                END
+               ) as total_fine
+               FROM borrows br
+               WHERE br.user_id = '$user_id'";
+$fine_result = mysqli_query($conn, $fine_query);
+$fine_data = mysqli_fetch_assoc($fine_result);
+$total_fine = $fine_data['total_fine'] ?: 0;
+
+// 2. Ambil detail buku yang terlambat dengan denda
+$overdue_books_query = "SELECT b.id, b.title, b.author, b.cover_image, 
+                       br.borrow_date, br.return_date,
+                       DATEDIFF(CURDATE(), br.return_date) as days_overdue,
+                       DATEDIFF(CURDATE(), br.return_date) * $fine_rate_per_day as fine_amount
+                       FROM borrows br
+                       JOIN books b ON br.book_id = b.id
+                       WHERE br.user_id = '$user_id' 
+                       AND br.status = 'borrowed' 
+                       AND br.return_date < CURDATE()
+                       ORDER BY br.return_date ASC";
+$overdue_books_result = mysqli_query($conn, $overdue_books_query);
 ?>
 
 <!DOCTYPE html>
@@ -52,6 +81,7 @@ $borrowed_result = mysqli_query($conn, $borrowed_query);
     <title>Dashboard - Perpustakaan Digital</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <link rel="stylesheet" href="dashboard.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="responsivedashboard.css?v=<?php echo time(); ?>">
 </head>
 <body class="<?= isset($_SESSION['darkmode']) && $_SESSION['darkmode'] ? 'dark-mode' : '' ?>">
     <div class="dashboard">
@@ -113,7 +143,6 @@ $borrowed_result = mysqli_query($conn, $borrowed_query);
         <!-- Main Content -->
         <div class="main-content">
             <div class="header">
-                <!-- Tambahkan toggle dark mode di bagian header-icons -->
                 <div class="header-icons">
                     <a href="#" class="notification">
                         <i class="fas fa-bell"></i>
@@ -152,14 +181,13 @@ $borrowed_result = mysqli_query($conn, $borrowed_query);
                 </div>
             </div>
 
-
             <div class="dashboard-stats">
                 <div class="stat-card">
                     <div class="stat-icon">
                         <i class="fas fa-book"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>Koleksi Buku</h3>
+                        <h3>Buku Tersedia</h3>
                         <?php
                         $count_books = mysqli_query($conn, "SELECT COUNT(*) as total FROM books");
                         $book_count = mysqli_fetch_assoc($count_books)['total'];
@@ -168,7 +196,6 @@ $borrowed_result = mysqli_query($conn, $borrowed_query);
                     </div>
                 </div>
                 <?php if ($user['role'] == 'admin'): ?>
-                <!-- Statistik Anggota - hanya tampilkan untuk admin -->
                 <div class="stat-card">
                     <div class="stat-icon">
                         <i class="fas fa-user-friends"></i>
@@ -191,10 +218,7 @@ $borrowed_result = mysqli_query($conn, $borrowed_query);
                     <div class="stat-info">
                         <h3>Dipinjam</h3>
                         <?php
-                        
-                        // Use this query to get active borrowings only
-                        // Fixed query using the correct table and field names
-$count_borrows = mysqli_query($conn, "SELECT COUNT(*) as total FROM borrows WHERE user_id='$user_id' AND status='borrowed' AND return_date > CURDATE()");
+                        $count_borrows = mysqli_query($conn, "SELECT COUNT(*) as total FROM borrows WHERE user_id='$user_id' AND status='borrowed' AND return_date > CURDATE()");
                         $borrow_count = mysqli_fetch_assoc($count_borrows)['total'];
                         ?>
                         <p><?php echo $borrow_count; ?> Buku</p>
@@ -207,70 +231,80 @@ $count_borrows = mysqli_query($conn, "SELECT COUNT(*) as total FROM borrows WHER
                     <div class="stat-info">
                         <h3>Jatuh Tempo</h3>
                         <?php
-                        // Pastikan query ini konsisten dengan struktur tabel:
-$count_due = mysqli_query($conn, "SELECT COUNT(*) as total FROM borrows WHERE user_id='$user_id' AND status='borrowed' AND return_date < CURDATE()");
+                        $count_due = mysqli_query($conn, "SELECT COUNT(*) as total FROM borrows WHERE user_id='$user_id' AND status='borrowed' AND return_date < CURDATE()");
                         $due_count = mysqli_fetch_assoc($count_due)['total'];
                         ?>
                         <p><?php echo $due_count; ?> Buku</p>
                     </div>
                 </div>
+
+                <!-- 3. Tambahkan ini ke dalam dashboard-stats, setelah stat-card terakhir -->
+                <div class="stat-card">
+                    <div class="stat-icon warning">
+                        <i class="fas fa-money-bill"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Total Denda</h3>
+                        <p>Rp <?php echo number_format($total_fine, 0, ',', '.'); ?></p>
+                    </div>
+                </div>
             </div>
 
             <div class="mini-calendar">
-            <div class="calendar-header">
-                <h3>Kalender Pengembalian</h3>
-                <span>April 2025</span>
+                <div class="calendar-header">
+                    <h3>Kalender Pengembalian</h3>
+                    <span>April 2025</span>
+                </div>
+                <div class="calendar-grid">
+                    <div class="calendar-day">M</div>
+                    <div class="calendar-day">S</div>
+                    <div class="calendar-day">S</div>
+                    <div class="calendar-day">R</div>
+                    <div class="calendar-day">K</div>
+                    <div class="calendar-day">J</div>
+                    <div class="calendar-day">S</div>
+                    
+                    <div class="calendar-day"></div>
+                    <div class="calendar-day"></div>
+                    <div class="calendar-day">1</div>
+                    <div class="calendar-day">2</div>
+                    <div class="calendar-day">3</div>
+                    <div class="calendar-day">4</div>
+                    <div class="calendar-day">5</div>
+                    
+                    <div class="calendar-day">6</div>
+                    <div class="calendar-day">7</div>
+                    <div class="calendar-day">8</div>
+                    <div class="calendar-day">9</div>
+                    <div class="calendar-day">10</div>
+                    <div class="calendar-day">11</div>
+                    <div class="calendar-day">12</div>
+                    
+                    <div class="calendar-day">13</div>
+                    <div class="calendar-day due-date">14</div>
+                    <div class="calendar-day">15</div>
+                    <div class="calendar-day">16</div>
+                    <div class="calendar-day">17</div>
+                    <div class="calendar-day">18</div>
+                    <div class="calendar-day">19</div>
+                    
+                    <div class="calendar-day">20</div>
+                    <div class="calendar-day">21</div>
+                    <div class="calendar-day due-date">22</div>
+                    <div class="calendar-day">23</div>
+                    <div class="calendar-day">24</div>
+                    <div class="calendar-day">25</div>
+                    <div class="calendar-day">26</div>
+                    
+                    <div class="calendar-day">27</div>
+                    <div class="calendar-day">28</div>
+                    <div class="calendar-day">29</div>
+                    <div class="calendar-day">30</div>
+                    <div class="calendar-day">31</div>
+                    <div class="calendar-day"></div>
+                    <div class="calendar-day"></div>
+                </div>
             </div>
-            <div class="calendar-grid">
-                <div class="calendar-day">M</div>
-                <div class="calendar-day">S</div>
-                <div class="calendar-day">S</div>
-                <div class="calendar-day">R</div>
-                <div class="calendar-day">K</div>
-                <div class="calendar-day">J</div>
-                <div class="calendar-day">S</div>
-                
-                <div class="calendar-day"></div>
-                <div class="calendar-day"></div>
-                <div class="calendar-day">1</div>
-                <div class="calendar-day">2</div>
-                <div class="calendar-day">3</div>
-                <div class="calendar-day">4</div>
-                <div class="calendar-day">5</div>
-                
-                <div class="calendar-day">6</div>
-                <div class="calendar-day">7</div>
-                <div class="calendar-day">8</div>
-                <div class="calendar-day">9</div>
-                <div class="calendar-day">10</div>
-                <div class="calendar-day">11</div>
-                <div class="calendar-day">12</div>
-                
-                <div class="calendar-day">13</div>
-                <div class="calendar-day due-date">14</div>
-                <div class="calendar-day">15</div>
-                <div class="calendar-day">16</div>
-                <div class="calendar-day">17</div>
-                <div class="calendar-day">18</div>
-                <div class="calendar-day">19</div>
-                
-                <div class="calendar-day">20</div>
-                <div class="calendar-day">21</div>
-                <div class="calendar-day due-date">22</div>
-                <div class="calendar-day">23</div>
-                <div class="calendar-day">24</div>
-                <div class="calendar-day">25</div>
-                <div class="calendar-day">26</div>
-                
-                <div class="calendar-day">27</div>
-                <div class="calendar-day">28</div>
-                <div class="calendar-day">29</div>
-                <div class="calendar-day">30</div>
-                <div class="calendar-day">31</div>
-                <div class="calendar-day"></div>
-                <div class="calendar-day"></div>
-            </div>
-        </div>
 
             <div class="content-row">
                 <div class="content-col">
@@ -324,46 +358,37 @@ $count_due = mysqli_query($conn, "SELECT COUNT(*) as total FROM borrows WHERE us
                 <div class="book-recommendation">
                     <h3>Rekomendasi Untuk Anda</h3>
                     <div class="recommendation-list">
-                        <div class="recommendation-item">
-                            <div class="recommendation-cover">
-                                <img src="uploads/laskar_pelangi.jpg" alt="Laskar Pelangi" 
-                                     style="width: 100%; height: 100%; object-fit: cover;">
+                        <?php
+                        // Ambil data buku untuk rekomendasi dari database
+                        $recommendation_query = "SELECT id, title, author, cover_image FROM books 
+                                        WHERE stock > 0 AND availability_status = 'available' 
+                                        ORDER BY popularity_score DESC, created_at DESC LIMIT 5";
+                        $recommendation_result = mysqli_query($conn, $recommendation_query);
+                        
+                        if (mysqli_num_rows($recommendation_result) > 0):
+                            while ($book = mysqli_fetch_assoc($recommendation_result)):
+                        ?>
+                            <div class="recommendation-item">
+                                <div class="recommendation-cover">
+                                    <?php if (!empty($book['cover_image']) && file_exists('uploads/' . $book['cover_image'])): ?>
+                                        <img src="uploads/<?php echo $book['cover_image']; ?>" alt="<?php echo $book['title']; ?>" 
+                                            style="width: 100%; height: 100%; object-fit: cover;">
+                                    <?php else: ?>
+                                        <i class="fas fa-book"></i>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="recommendation-title"><?php echo $book['title']; ?></div>
+                                <div class="recommendation-author"><?php echo $book['author']; ?></div>
                             </div>
-                            <div class="recommendation-title">Laskar Pelangi</div>
-                            <div class="recommendation-author">Andrea Hirata</div>
-                        </div>
-                        <div class="recommendation-item">
-                            <div class="recommendation-cover">
-                                <img src="uploads/bumi_manusia.jpg" alt="Bumi Manusia" 
-                                     style="width: 100%; height: 100%; object-fit: cover;">
+                        <?php 
+                            endwhile;
+                        else:
+                        ?>
+                            <div class="empty-state">
+                                <i class="fas fa-info-circle"></i>
+                                <p>Belum ada rekomendasi buku tersedia</p>
                             </div>
-                            <div class="recommendation-title">Bumi Manusia</div>
-                            <div class="recommendation-author">Pramoedya Ananta Toer</div>
-                        </div>
-                        <div class="recommendation-item">
-                            <div class="recommendation-cover">
-                                <img src="uploads/filosofi_teras.jpg" alt="Filosofi Teras" 
-                                     style="width: 100%; height: 100%; object-fit: cover;">
-                            </div>
-                            <div class="recommendation-title">Filosofi Teras</div>
-                            <div class="recommendation-author">Henry Manampiring</div>
-                        </div>
-                        <div class="recommendation-item">
-                            <div class="recommendation-cover">
-                                <img src="uploads/pulang.jpg" alt="Pulang" 
-                                     style="width: 100%; height: 100%; object-fit: cover;">
-                            </div>
-                            <div class="recommendation-title">Pulang</div>
-                            <div class="recommendation-author">Tere Liye</div>
-                        </div>
-                        <div class="recommendation-item">
-                            <div class="recommendation-cover">
-                                <img src="uploads/sang_pemimpi.jpg" alt="Sang Pemimpi" 
-                                     style="width: 100%; height: 100%; object-fit: cover;">
-                            </div>
-                            <div class="recommendation-title">Sang Pemimpi</div>
-                            <div class="recommendation-author">Andrea Hirata</div>
-                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
                 
@@ -457,93 +482,50 @@ $count_due = mysqli_query($conn, "SELECT COUNT(*) as total FROM borrows WHERE us
                     </div>
                 </div>
 
-                <!-- Tambahkan bagian Reading Tracker -->
-                <!-- Bagian Reading Tracker -->
-<!-- Bagian Reading Tracker -->
-<div class="card">
-    <div class="card-header">
-        <h2>Reading Tracker</h2>
-        <a href="borrowed.php" class="view-all">Lihat Semua</a>
-    </div>
-    <div class="card-content">
-        <div class="reading-tracker-list">
-            <?php
-            // Fetch books currently borrowed by the user
-            $reading_query = "SELECT br.*, b.title, b.author, b.cover_image, b.id as book_id,
-                             COALESCE(rp.current_page, 0) as current_page,
-                             COALESCE(rp.total_pages, 100) as total_pages,
-                             COALESCE(rp.notes, '') as notes
-                             FROM borrows br
-                             JOIN books b ON br.book_id = b.id
-                             LEFT JOIN reading_progress rp ON br.book_id = rp.book_id AND rp.user_id = br.user_id
-                             WHERE br.user_id = '$user_id' AND br.status = 'borrowed'
-                             ORDER BY br.borrow_date DESC
-                             LIMIT 5";
-            $reading_result = mysqli_query($conn, $reading_query);
-            
-            if (mysqli_num_rows($reading_result) > 0):
-                while ($reading = mysqli_fetch_assoc($reading_result)):
-                    // Calculate the percentage (default to 0 if no reading progress exists)
-                    $current_page = $reading['current_page'] ? $reading['current_page'] : 0;
-                    $total_pages = $reading['total_pages'] ? $reading['total_pages'] : 100; // Default to 100 pages
-                    $percentage = ($total_pages > 0) ? round(($current_page / $total_pages) * 100) : 0;
-                    
-                    // Calculate days remaining for return
-                    $today = new DateTime();
-                    $return_date = new DateTime($reading['return_date']);
-                    $days_remaining = $today->diff($return_date)->days;
-                    $is_overdue = $return_date < $today;
-            ?>
-            <div class="reading-tracker-item" data-book-id="<?php echo $reading['book_id']; ?>">
-                <div class="book-cover">
-                    <?php if (!empty($reading['cover_image']) && file_exists('uploads/' . $reading['cover_image'])): ?>
-                        <img src="uploads/<?php echo $reading['cover_image']; ?>" alt="<?php echo $reading['title']; ?>"
-                             style="width: 100%; height: 100%; object-fit: cover;">
-                    <?php else: ?>
-                        <i class="fas fa-book"></i>
-                    <?php endif; ?>
-                </div>
-                <div class="reading-progress">
-                    <div class="book-title"><?php echo $reading['title']; ?></div>
-                    <div class="book-author"><?php echo $reading['author']; ?></div>
-                    <div class="progress-info">
-                        <span>Halaman <?php echo $current_page; ?> dari <?php echo $total_pages; ?></span>
-                        <span><?php echo $percentage; ?>%</span>
+                <!-- Bagian Denda Keterlambatan -->
+                <?php if (mysqli_num_rows($overdue_books_result) > 0): ?>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Denda Keterlambatan</h2>
+                        <a href="fines.php" class="view-all">Lihat Semua</a>
                     </div>
-                    <div class="loan-progress">
-                        <div class="progress-bar progress-good" style="width: <?php echo $percentage; ?>%;"></div>
-                    </div>
-                    <div class="return-info <?php echo $is_overdue ? 'overdue' : ''; ?>">
-                        <?php if ($is_overdue): ?>
-                            <span><i class="fas fa-exclamation-circle"></i> Terlambat <?php echo $days_remaining; ?> hari</span>
-                        <?php else: ?>
-                            <span><i class="fas fa-calendar-alt"></i> Kembali dalam <?php echo $days_remaining; ?> hari</span>
-                        <?php endif; ?>
+                    <div class="card-content">
+                        <div class="fine-list">
+                            <?php while ($overdue = mysqli_fetch_assoc($overdue_books_result)): ?>
+                                <div class="fine-item">
+                                    <div class="book-cover">
+                                        <?php if (!empty($overdue['cover_image']) && file_exists('uploads/' . $overdue['cover_image'])): ?>
+                                            <img src="uploads/<?php echo $overdue['cover_image']; ?>" alt="<?php echo $overdue['title']; ?>" style="width: 100%; height: 100%; object-fit: cover;">
+                                        <?php else: ?>
+                                            <i class="fas fa-book"></i>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="fine-details">
+                                        <h3><?php echo $overdue['title']; ?></h3>
+                                        <p class="author"><?php echo $overdue['author']; ?></p>
+                                        <div class="fine-info">
+                                            <p><i class="fas fa-calendar-times"></i> Jatuh tempo: <?php echo date('d M Y', strtotime($overdue['return_date'])); ?></p>
+                                            <p><i class="fas fa-clock"></i> Terlambat: <?php echo $overdue['days_overdue']; ?> hari</p>
+                                            <p class="fine-amount"><i class="fas fa-money-bill"></i> Denda: Rp <?php echo number_format($overdue['fine_amount'], 0, ',', '.'); ?></p>
+                                        </div>
+                                        <div class="fine-actions">
+                                            <a href="return_book.php?id=<?php echo $overdue['id']; ?>" class="btn-return">
+                                                <i class="fas fa-undo-alt"></i> Kembalikan Buku
+                                            </a>
+                                            <a href="pay_fine.php?id=<?php echo $overdue['id']; ?>" class="btn-pay">
+                                                <i class="fas fa-money-bill"></i> Bayar Denda
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endwhile; ?>
+                        </div>
                     </div>
                 </div>
-                <div class="reading-actions">
-                    <button class="btn-update" data-book-id="<?php echo $reading['book_id']; ?>" 
-                            data-title="<?php echo $reading['title']; ?>"
-                            data-current-page="<?php echo $current_page; ?>" 
-                            data-total-pages="<?php echo $total_pages; ?>"
-                            data-notes="<?php echo htmlspecialchars($reading['notes']); ?>">
-                        <i class="fas fa-edit"></i> Update
-                    </button>
-                </div>
+                <?php endif; ?>
             </div>
-            <?php 
-                endwhile;
-            else:
-            ?>
-            <div class="empty-state">
-                <i class="fas fa-book-reader"></i>
-                <p>Anda belum meminjam buku</p>
-                <a href="catalog.php" class="btn-browse">Pinjam Buku</a>
-            </div>
-            <?php endif; ?>
         </div>
     </div>
-</div>
 <script src="dashboard.js"></script>
 </body>
 </html>

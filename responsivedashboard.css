@@ -1,0 +1,95 @@
+/* dashboard-responsive.css */
+
+/* Layar ≤ 1024px (Tablet & Laptop kecil) */
+@media (max-width: 1024px) {
+    .dashboard-stats {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  
+    .main-content {
+      padding: 15px;
+    }
+  }
+  
+  /* Layar ≤ 768px (Tablet Portrait & HP landscape) */
+  @media (max-width: 768px) {
+    .sidebar {
+      width: 70px;
+      min-width: 70px;
+      overflow: hidden;
+    }
+  
+    .main-content {
+      margin-left: 70px;
+      width: calc(100% - 70px);
+    }
+  
+    .logo h2,
+    .user-info h3,
+    .user-info p,
+    .nav-links li a span {
+      display: none;
+    }
+  
+    .dashboard-stats,
+    .content-row {
+      grid-template-columns: 1fr;
+    }
+  
+    .search-bar {
+      max-width: 100%;
+    }
+  
+    .stat-card {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+  
+  /* Layar ≤ 480px (HP kecil) */
+  @media (max-width: 480px) {
+    .welcome-banner {
+      flex-direction: column;
+      text-align: center;
+      padding: 20px;
+    }
+  
+    .welcome-image {
+      margin-top: 15px;
+    }
+  
+    .header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+  
+    .header-icons {
+      justify-content: flex-start;
+      width: 100%;
+    }
+  
+    .btn-detail,
+    .btn-extend,
+    .btn-return {
+      font-size: 11px;
+      padding: 5px 10px;
+    }
+  
+    .borrow-item,
+    .book-item {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+  
+    .book-info,
+    .borrow-details {
+      align-items: center;
+    }
+  
+    .search-bar input {
+      font-size: 13px;
+    }
+  }
+  
